@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>RIASEC 職業性向探索</title>
+    <style>
+        /* ... 前面樣式保持不變 ... */
+
+        /* 這裡更新 #result-display 的浮誇效果 */
+        #result-display {
+            margin-top: 20px; 
+            font-size: 80px; /* 加大字體 */
+            font-weight: 900;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            /* Low Poly 晶體感配色 */
+            color: #2d3436;
+            
+            /* 預設隱藏，動畫觸發時顯示 */
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: scale(0.5) rotate(-10deg);
+        }
+
+        /* 數字跳出時的樣式類別 */
+        #result-display.show {
+            opacity: 1;
+            transform: scale(1.2) rotate(0deg);
+            
+            /* 浮誇的多重立體陰影 (Low Poly 深度感) */
+            text-shadow: 
+                1px 1px 0px #fff,
+                2px 2px 0px #d3d3d3,
+                4px 4px 0px #b5d99c,
+                6px 6px 0px #98c1d9,
+                8px 8px 20px rgba(0,0,0,0.2);
+            
+            animation: bounce 0.6s ease-out forwards;
+        }
+
+        /* 浮誇彈跳動畫 */
+        @keyframes bounce {
+            0% { transform: scale(0.5); filter: brightness(2); }
+            50% { transform: scale(1.4); filter: brightness(1.2); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1.2); }
+        }
+
+        /* 基礎樣式補充 ... */
+        :root { --bg-fallback: #f0efeb; --frame-color: rgba(255, 255, 255, 0.85); --accent-dark: #4a4a4a; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-image: url('bg1.png'); background-size: cover; background-position: center center; background-attachment: fixed; background-repeat: no-repeat; background-color: var(--bg-fallback); color: #4a4a4a; font-family: 'Microsoft JhengHei', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .header-section { text-align: center; margin-bottom: 25px; background: rgba(255, 255, 255, 0.7); padding: 15px 30px; border-radius: 15px; backdrop-filter: blur(5px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .title-main { font-size: 28px; font-weight: bold; display: block; margin-bottom: 5px; color: #2c3e50; }
+        .title-sub { font-size: 16px; color: #555; display: block; }
+        .outer-frame { position: relative; width: 480px; height: 480px; display: flex; justify-content: center; align-items: center; background: var(--frame-color); border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
+        .pointer { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 35px solid var(--accent-dark); z-index: 10; }
+        #wheel-wrapper { width: 420px; height: 420px; transition: transform 4.5s cubic-bezier(0.15, 0, 0.2, 1); }
+        canvas { display: block; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.05)); }
+        .controls { margin-top: 25px; }
+        button { padding: 12px 60px; font-size: 20px; cursor: pointer; background: #ffffff; color: #4a4a4a; border: 2px solid #4a4a4a; border-radius: 50px; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #4a4a4a; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="header-section">
+        <span class="title-main">猜猜這個職業屬於 RIASEC 屬於哪個性向?</span>
+        <span class="title-sub">(部分職業屬於多於一個性向, 只答一項即可)</span>
+    </div>
+
+    <div class="outer-frame">
+        <div class="pointer"></div>
+        <div id="wheel-wrapper">
+            <canvas id="canvas" width="420" height="420"></canvas>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="spin()">啟動轉盤</button>
+    </div>
+
+    <div id="result-display">?</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('wheel-wrapper');
+        const resDisplay = document.getElementById('result-display');
+        let currentRot = 0;
+        let isSpinning = false;
+
+        const palette = ['#eab69f', '#f2d492', '#b5d99c', '#98c1d9', '#c0b2d3', '#d3d3d3'];
+
+        function draw() {
+            const num = 20;
+            const angle = (Math.PI * 2) / num;
+            const r = 210;
+            ctx.clearRect(0,0,420,420);
+            for(let i=0; i<num; i++) {
+                const sA = i * angle;
+                const eA = (i+1) * angle;
+                const mA = sA + angle/2;
+                ctx.beginPath();
+                ctx.moveTo(210, 210);
+                ctx.lineTo(210 + Math.cos(sA)*r, 210 + Math.sin(sA)*r);
+                ctx.lineTo(210 + Math.cos(eA)*r, 210 + Math.sin(eA)*r);
+                ctx.closePath();
+                ctx.fillStyle = palette[i % palette.length];
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.save();
+                ctx.translate(210, 210);
+                ctx.rotate(mA);
+                ctx.fillStyle = "#4a4a4a";
+                ctx.font = "bold 24px Arial";
+                ctx.textAlign = "right";
+                ctx.fillText(i + 1, r - 15, 8);
+                ctx.restore();
+            }
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+
+            // 重置數字效果
+            resDisplay.classList.remove('show');
+            resDisplay.innerText = "...";
+
+            currentRot += (1800 + Math.floor(Math.random() * 360));
+            wrapper.style.transform = `rotate(${currentRot}deg)`;
+
+            setTimeout(() => {
+                const finalA = (currentRot % 360);
+                const idx = Math.floor(((360 - finalA + 270) % 360) / (360/20));
+                
+                // 顯示數字並加入浮誇類別
+                resDisplay.innerText = idx + 1;
+                resDisplay.classList.add('show');
+                
+                isSpinning = false;
+            }, 4500);
+        }
+        draw();
+    </script>
+</body>
+</html>
