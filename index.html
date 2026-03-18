@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RIASEC 職業性向探索 - 強化版</title>
+    <style>
+        :root {
+            --bg-fallback: #f0efeb; 
+            --frame-color: rgba(255, 255, 255, 0.85);
+            --accent-dark: #4a4a4a;
+            --highlight: #eab69f; /* 採用轉盤中的陶粉色作為強化的重點色 */
+        }
+
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body, html { 
+            height: 100%; width: 100%;
+            overflow: hidden;
+            background-color: var(--bg-fallback);
+            font-family: 'Microsoft JhengHei', sans-serif;
+        }
+
+        .main-container {
+            background-image: url('bg1.png');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            width: 100%;
+            height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            position: relative; /* 為了讓結果號碼絕對定位 */
+        }
+
+        /* 標題區塊 */
+        .header-section {
+            text-align: center;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 12px 25px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            z-index: 5;
+        }
+
+        .title-main { font-size: 24px; font-weight: bold; color: #2c3e50; }
+        .title-sub { font-size: 14px; color: #555; margin-top: 5px; }
+
+        /* 右上角號碼結果區塊 */
+        #result-container {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            width: 150px;
+            height: 150px;
+            background: var(--frame-color);
+            border: 4px solid var(--accent-dark);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 10px 10px 0px var(--highlight); /* Low Poly 立體陰影 */
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: rotate(5deg);
+        }
+
+        .result-label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #777;
+            margin-bottom: -5px;
+        }
+
+        #result-display {
+            font-size: 80px; /* 號碼加大 */
+            font-weight: 900;
+            color: #2d3436;
+            line-height: 1;
+        }
+
+        /* 轉盤主體 */
+        .outer-frame {
+            position: relative; 
+            width: 500px;
+            height: 500px;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            background: var(--frame-color);
+            border-radius: 50%;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        #wheel-wrapper {
+            width: 440px;
+            height: 440px;
+            transition: transform 4.5s cubic-bezier(0.15, 0, 0.2, 1);
+        }
+
+        canvas { width: 440px; height: 440px; }
+
+        .pointer {
+            position: absolute; 
+            top: -15px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            width: 0; height: 0; 
+            border-left: 20px solid transparent; 
+            border-right: 20px solid transparent;
+            border-top: 45px solid var(--accent-dark); 
+            z-index: 10;
+        }
+
+        /* 啟動按鈕 */
+        .controls { margin-top: 40px; }
+        button { 
+            padding: 15px 70px; 
+            font-size: 24px; 
+            cursor: pointer;
+            background: #ffffff; 
+            color: #4a4a4a; 
+            border: 3px solid #4a4a4a;
+            border-radius: 50px; 
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: 0.2s;
+        }
+        button:active { transform: scale(0.95); }
+
+        /* 動畫效果：當結果出現時 */
+        .pop-effect {
+            animation: pop 0.5s ease-out;
+            background-color: #fff !important;
+            box-shadow: 15px 15px 0px #b5d99c !important; /* 變換陰影顏色 */
+        }
+
+        @keyframes pop {
+            0% { transform: rotate(5deg) scale(1); }
+            50% { transform: rotate(0deg) scale(1.3); }
+            100% { transform: rotate(5deg) scale(1.1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div id="result-container">
+            <span class="result-label">號碼</span>
+            <div id="result-display">?</div>
+        </div>
+
+        <div class="header-section">
+            <span class="title-main">猜猜這個職業屬於 RIASEC 哪個性向?</span>
+            <span class="title-sub">(部分職業屬於多於一個性向, 只答一項即可)</span>
+        </div>
+
+        <div class="outer-frame">
+            <div class="pointer"></div>
+            <div id="wheel-wrapper">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="spin()">啟動轉盤</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('wheel-wrapper');
+        const resDisplay = document.getElementById('result-display');
+        const resContainer = document.getElementById('result-container');
+        let currentRot = 0;
+        let isSpinning = false;
+
+        const palette = ['#eab69f', '#f2d492', '#b5d99c', '#98c1d9', '#c0b2d3', '#d3d3d3'];
+
+        function initCanvas() {
+            canvas.width = 440; 
+            canvas.height = 440;
+            draw();
+        }
+
+        function draw() {
+            const num = 20;
+            const angle = (Math.PI * 2) / num;
+            const center = 220;
+            const r = center * 0.95;
+            
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            for(let i=0; i<num; i++) {
+                const sA = i * angle;
+                const eA = (i+1) * angle;
+                const mA = sA + angle/2;
+
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.lineTo(center + Math.cos(sA)*r, center + Math.sin(sA)*r);
+                ctx.lineTo(center + Math.cos(eA)*r, center + Math.sin(eA)*r);
+                ctx.closePath();
+                
+                ctx.fillStyle = palette[i % palette.length];
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(mA);
+                ctx.fillStyle = "#4a4a4a";
+                ctx.font = `bold 24px Arial`;
+                ctx.textAlign = "right";
+                ctx.fillText(i + 1, center - 20, 8);
+                ctx.restore();
+            }
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            
+            // 重置樣式
+            resContainer.classList.remove('pop-effect');
+            resDisplay.innerText = "...";
+            resDisplay.style.fontSize = "40px";
+
+            currentRot += (1800 + Math.floor(Math.random() * 360));
+            wrapper.style.transform = `rotate(${currentRot}deg)`;
+
+            setTimeout(() => {
+                const finalA = (currentRot % 360);
+                const idx = Math.floor(((360 - finalA + 270) % 360) / (360/20));
+                
+                resDisplay.innerText = idx + 1;
+                resDisplay.style.fontSize = "80px";
+                resContainer.classList.add('pop-effect');
+                
+                isSpinning = false;
+            }, 4500);
+        }
+
+        initCanvas();
+    </script>
+</body>
+</html>
