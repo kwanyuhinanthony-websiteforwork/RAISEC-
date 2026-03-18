@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RIASEC 職業性向探索</title>
+    <style>
+        :root {
+            --bg-fallback: #f0efeb; 
+            --frame-color: rgba(255, 255, 255, 0.85);
+            --accent-dark: #4a4a4a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+
+        body, html { 
+            height: 100%;
+            width: 100%;
+            overflow: hidden; 
+            background-color: var(--bg-fallback);
+            font-family: 'Microsoft JhengHei', sans-serif;
+        }
+
+        .main-container {
+            background-image: url('bg1.png');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            width: 100%;
+            height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 2vh;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            max-width: 90%;
+            z-index: 5;
+        }
+
+        .title-main {
+            font-size: clamp(18px, 3.5vw, 24px);
+            font-weight: bold;
+            display: block;
+            color: #2c3e50;
+        }
+
+        .title-sub {
+            font-size: clamp(12px, 1.8vw, 14px);
+            color: #555;
+            display: block;
+            margin-top: 5px;
+        }
+
+        /* --- 修正處：強制 1:1 比例防止橢圓 --- */
+        .outer-frame {
+            position: relative; 
+            width: 70vmin; 
+            height: 70vmin; /* 寬高一致 */
+            aspect-ratio: 1 / 1; /* 強制比例 */
+            
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            background: var(--frame-color);
+            border-radius: 50%; /* 改為圓形外框更自然 */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        #wheel-wrapper {
+            width: 90%; 
+            height: 90%;
+            aspect-ratio: 1 / 1; /* 強制內部也是正圓 */
+            transition: transform 4.5s cubic-bezier(0.15, 0, 0.2, 1);
+        }
+
+        canvas { 
+            display: block; 
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.05)); 
+        }
+        /* ---------------------------------- */
+
+        .pointer {
+            position: absolute; 
+            top: -10px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent; 
+            border-right: 20px solid transparent;
+            border-top: 40px solid var(--accent-dark); 
+            z-index: 10;
+        }
+
+        .controls { margin-top: 3vh; }
+
+        button { 
+            padding: 12px 50px; 
+            font-size: 20px; 
+            cursor: pointer;
+            background: #ffffff; 
+            color: #4a4a4a; 
+            border: 2px solid #4a4a4a;
+            border-radius: 50px; 
+            font-weight: bold;
+        }
+
+        #result-display {
+            margin-top: 15px; 
+            font-size: 60px;
+            font-weight: 900;
+            min-height: 70px;
+            color: #2d3436;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: scale(0.5);
+        }
+
+        #result-display.show {
+            opacity: 1;
+            transform: scale(1);
+            text-shadow: 2px 2px 0px #fff, 4px 4px 0px #b5d99c;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="header-section">
+            <span class="title-main">猜猜這個職業屬於 RIASEC 哪個性向?</span>
+            <span class="title-sub">(部分職業屬於多於一個性向, 只答一項即可)</span>
+        </div>
+
+        <div class="outer-frame">
+            <div class="pointer"></div>
+            <div id="wheel-wrapper">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="spin()">啟動轉盤</button>
+        </div>
+
+        <div id="result-display">?</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('wheel-wrapper');
+        const resDisplay = document.getElementById('result-display');
+        let currentRot = 0;
+        let isSpinning = false;
+
+        const palette = ['#eab69f', '#f2d492', '#b5d99c', '#98c1d9', '#c0b2d3', '#d3d3d3'];
+
+        function initCanvas() {
+            // 取得容器實際寬度，強制設定 Canvas 為正方形
+            const size = canvas.parentElement.clientWidth;
+            canvas.width = size * 2; 
+            canvas.height = size * 2;
+            draw();
+        }
+
+        function draw() {
+            const num = 20;
+            const angle = (Math.PI * 2) / num;
+            const center = canvas.width / 2;
+            const r = center * 0.95;
+            
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            for(let i=0; i<num; i++) {
+                const sA = i * angle;
+                const eA = (i+1) * angle;
+                const mA = sA + angle/2;
+
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.lineTo(center + Math.cos(sA)*r, center + Math.sin(sA)*r);
+                ctx.lineTo(center + Math.cos(eA)*r, center + Math.sin(eA)*r);
+                ctx.closePath();
+                
+                ctx.fillStyle = palette[i % palette.length];
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(mA);
+                ctx.fillStyle = "#4a4a4a";
+                ctx.font = `bold ${canvas.width * 0.06}px Arial`;
+                ctx.textAlign = "right";
+                ctx.fillText(i + 1, r - 20, canvas.width * 0.02);
+                ctx.restore();
+            }
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            resDisplay.classList.remove('show');
+            resDisplay.innerText = "...";
+
+            currentRot += (1800 + Math.floor(Math.random() * 360));
+            wrapper.style.transform = `rotate(${currentRot}deg)`;
+
+            setTimeout(() => {
+                const finalA = (currentRot % 360);
+                const idx = Math.floor(((360 - finalA + 270) % 360) / (360/20));
+                resDisplay.innerText = idx + 1;
+                resDisplay.classList.add('show');
+                isSpinning = false;
+            }, 4500);
+        }
+
+        window.addEventListener('resize', initCanvas);
+        // 初始化延遲一點點，確保 DOM 渲染完成後取得正確寬度
+        setTimeout(initCanvas, 100);
+    </script>
+</body>
+</html>
