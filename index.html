@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RIASEC 職業性向探索 - 穩定版</title>
+    <style>
+        :root {
+            --bg-fallback: #f0efeb; 
+            --frame-color: rgba(255, 255, 255, 0.85);
+            --accent-dark: #4a4a4a;
+        }
+
+        /* 核心：禁止所有滑動與縮放 */
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            touch-action: none; /* 禁止所有觸摸動作（防止誤觸滑動） */
+        }
+
+        body, html { 
+            height: 100%; width: 100%;
+            overflow: hidden; /* 防止捲動 */
+            background-color: var(--bg-fallback);
+            font-family: 'Microsoft JhengHei', sans-serif;
+        }
+
+        /* 背景與整體垂直排列 */
+        .main-container {
+            background-image: url('bg1.png');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            width: 100%;
+            height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; /* 讓所有內容居中 */
+            padding: 10px;
+        }
+
+        /* 標題：固定像素大小 */
+        .header-section {
+            text-align: center;
+            margin-bottom: 30px; /* 固定間距 */
+            background: rgba(255, 255, 255, 0.7);
+            padding: 12px 25px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .title-main {
+            font-size: 24px; /* 固定字體大小 */
+            font-weight: bold;
+            display: block;
+            color: #2c3e50;
+        }
+
+        .title-sub {
+            font-size: 14px;
+            color: #555;
+            display: block;
+            margin-top: 5px;
+        }
+
+        /* --- 修正處：強制固定像素大小，保證正圓 --- */
+        .outer-frame {
+            position: relative; 
+            width: 480px;  /* 固定像素寬度 */
+            height: 480px; /* 固定像素高度 */
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            background: var(--frame-color);
+            border-radius: 50%; /* 改為圓形外框更自然 */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        #wheel-wrapper {
+            width: 420px; /* 固定內部大小 */
+            height: 420px;
+            transition: transform 4.5s cubic-bezier(0.15, 0, 0.2, 1);
+        }
+
+        /* canvas 直接設定與 wrapper 一樣大小 */
+        canvas { 
+            display: block; 
+            width: 420px;
+            height: 420px;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.05)); 
+        }
+        /* -------------------------------------- */
+
+        .pointer {
+            position: absolute; 
+            top: -10px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent; 
+            border-right: 20px solid transparent;
+            border-top: 40px solid var(--accent-dark); 
+            z-index: 10;
+        }
+
+        /* 控制區域：固定像素間距 */
+        .controls { 
+            margin-top: 30px; /* 固定間距 */
+        }
+
+        button { 
+            padding: 12px 60px; 
+            font-size: 20px; 
+            cursor: pointer;
+            background: #ffffff; 
+            color: #4a4a4a; 
+            border: 2px solid #4a4a4a;
+            border-radius: 50px; 
+            font-weight: bold;
+        }
+
+        /* --- 修正處：數字結果固定像素大小，並調整字體與位置 --- */
+        #result-display {
+            margin-top: 20px; /* 固定像素間距，避免掉下去 */
+            font-size: 50px; /* 稍微縮小字體大小 */
+            font-weight: 900;
+            min-height: 60px; /* 固定像素高度 */
+            color: #2d3436;
+            display: flex; /* 垂直水平居中 */
+            align-items: center;
+            justify-content: center;
+            text-shadow: 2px 2px 0px #fff, 4px 4px 0px #b5d99c;
+            
+            /* 預設隱藏 */
+            transition: opacity 0.5s ease;
+            opacity: 0;
+        }
+
+        #result-display.show {
+            opacity: 1;
+        }
+        /* -------------------------------------- */
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="header-section">
+            <span class="title-main">猜猜這個職業屬於 RIASEC 哪個性向?</span>
+            <span class="title-sub">(部分職業屬於多於一個性向, 只答一項即可)</span>
+        </div>
+
+        <div class="outer-frame">
+            <div class="pointer"></div>
+            <div id="wheel-wrapper">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="spin()">啟動轉盤</button>
+        </div>
+
+        <div id="result-display">?</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('wheel-wrapper');
+        const resDisplay = document.getElementById('result-display');
+        let currentRot = 0;
+        let isSpinning = false;
+
+        const palette = ['#eab69f', '#f2d492', '#b5d99c', '#98c1d9', '#c0b2d3', '#d3d3d3'];
+
+        function initCanvas() {
+            // 固定使用 420x420 的畫布大小
+            canvas.width = 420; 
+            canvas.height = 420;
+            draw();
+        }
+
+        function draw() {
+            const num = 20;
+            const angle = (Math.PI * 2) / num;
+            const center = 210; // 420 / 2
+            const r = center * 0.95;
+            
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            for(let i=0; i<num; i++) {
+                const sA = i * angle;
+                const eA = (i+1) * angle;
+                const mA = sA + angle/2;
+
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.lineTo(center + Math.cos(sA)*r, center + Math.sin(sA)*r);
+                ctx.lineTo(center + Math.cos(eA)*r, center + Math.sin(eA)*r);
+                ctx.closePath();
+                
+                ctx.fillStyle = palette[i % palette.length];
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(mA);
+                ctx.fillStyle = "#4a4a4a";
+                // 固定像素字體大小
+                ctx.font = `bold 22px Arial`;
+                ctx.textAlign = "right";
+                // 調整數字位置
+                ctx.fillText(i + 1, center - 20, 8);
+                ctx.restore();
+            }
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            resDisplay.classList.remove('show');
+            resDisplay.innerText = "...";
+
+            currentRot += (1800 + Math.floor(Math.random() * 360));
+            wrapper.style.transform = `rotate(${currentRot}deg)`;
+
+            setTimeout(() => {
+                const finalA = (currentRot % 360);
+                const idx = Math.floor(((360 - finalA + 270) % 360) / (360/20));
+                resDisplay.innerText = idx + 1;
+                resDisplay.classList.add('show');
+                isSpinning = false;
+            }, 4500);
+        }
+
+        // 行動裝置優化：禁止觸摸動作以防止滑動
+        document.addEventListener('touchstart', (e) => {
+            // 只有按鈕和 canvas 允許觸摸
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'CANVAS') {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        initCanvas();
+    </script>
+</body>
+</html>
